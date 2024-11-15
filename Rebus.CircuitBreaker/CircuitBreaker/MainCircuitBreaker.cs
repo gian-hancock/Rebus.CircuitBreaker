@@ -99,17 +99,18 @@ class MainCircuitBreaker : IInitializable, IDisposable
 
         // if we're currently executing a message handler, we must execute the operation asynchronously,
         // otherwise we'll end up with a deadlock
-        if (MessageContext.Current == null)
-        {
-            _log.Warn("Not currently executing a message handler, setting workers synchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
-            workers.SetNumberOfWorkers(count);
-            _log.Warn("Finished setting workers synchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
-        }
-        else
+        //if (MessageContext.Current == null)
+        //{
+        //    _log.Warn("Not currently executing a message handler, setting workers synchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
+        //    workers.SetNumberOfWorkers(count);
+        //    _log.Warn("Finished setting workers synchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
+        //}
+        //else
         {
             _log.Warn("Currently executing a message handler, setting workers asynchronously. Time: {Time}", DateTime.Now.ToString("HH:mm:ss.fff"));
             Task.Run(() =>
             {
+                Task.Delay(500).Wait();
                 workers.SetNumberOfWorkers(count);
                 _log.Warn("Finished setting workers asynchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
             });

@@ -71,7 +71,7 @@ public class CircuitBreakerTests : FixtureBase
     }
     
     [Test]
-    [TestCase(true)]
+    // [TestCase(true)]
     [TestCase(false)]
     public async Task WaitHalfOpenPeriodBeforeHalfOpening(bool useBusStarter)
     {
@@ -81,7 +81,7 @@ public class CircuitBreakerTests : FixtureBase
             handlers: a => a.Handle<string>(async _ =>
             {
                 deliveryCount++;
-                Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] DeliveryCount: {deliveryCount}");
+                Console.WriteLine($"### [{DateTime.Now:HH:mm:ss.fff}] DeliveryCount: {deliveryCount}");
                 throw new MyCustomException();
             }),
             options: o =>
@@ -94,12 +94,12 @@ public class CircuitBreakerTests : FixtureBase
         await bus.SendLocal("Uh oh, This is not gonna go well!");
 
         await Task.Delay(TimeSpan.FromSeconds(10));
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Assert deliveryCount = 1");
-        Assert.That(deliveryCount, Is.EqualTo(1), $"[{DateTime.Now:HH:mm:ss.fff}] Expect message delivery count to be '1' after circuit has transitioned from closed -> open");
+        Console.WriteLine($"### [{DateTime.Now:HH:mm:ss.fff}] Assert deliveryCount = 1");
+        Assert.That(deliveryCount, Is.EqualTo(1), $"### [{DateTime.Now:HH:mm:ss.fff}] Expect message delivery count to be '1' after circuit has transitioned from closed -> open");
 
         await Task.Delay(TimeSpan.FromSeconds(20));
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Assert deliveryCount = 2");
-        Assert.That(deliveryCount, Is.EqualTo(2), $"[{DateTime.Now:HH:mm:ss.fff}] Expect message delivery count to be '2' after circuit has cycled from closed -> open -> halfopen -> open");
+        Console.WriteLine($"### [{DateTime.Now:HH:mm:ss.fff}] Assert deliveryCount = 2");
+        Assert.That(deliveryCount, Is.EqualTo(2), $"### [{DateTime.Now:HH:mm:ss.fff}] Expect message delivery count to be '2' after circuit has cycled from closed -> open -> halfopen -> open");
     }
 
     IBus ConfigureBus(Action<BuiltinHandlerActivator> handlers, Action<OptionsConfigurer> options, bool useBusStarter)

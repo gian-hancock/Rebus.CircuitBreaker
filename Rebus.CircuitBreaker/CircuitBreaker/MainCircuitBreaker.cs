@@ -107,12 +107,12 @@ class MainCircuitBreaker : IInitializable, IDisposable
         //}
         //else
         {
-            _log.Warn("Currently executing a message handler, setting workers asynchronously. Time: {Time}", DateTime.Now.ToString("HH:mm:ss.fff"));
+            _log.Warn("### Currently executing a message handler, setting workers asynchronously. Time: {Time}", DateTime.Now.ToString("HH:mm:ss.fff"));
             Task.Run(() =>
             {
                 Task.Delay(500).Wait();
                 workers.SetNumberOfWorkers(count);
-                _log.Warn("Finished setting workers asynchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
+                _log.Warn("### Finished setting workers asynchronously. Time: {Time}; Count {Count}", DateTime.Now.ToString("HH:mm:ss.fff"), count);
             });
         }
     }

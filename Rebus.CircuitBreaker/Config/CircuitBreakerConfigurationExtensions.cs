@@ -71,11 +71,34 @@ public static class CircuitBreakerConfigurationExtensions
             int attempts = CircuitBreakerSettings.DefaultAttempts,
             int trackingPeriodInSeconds = CircuitBreakerSettings.DefaultTrackingPeriodInSeconds,
             int halfOpenPeriodInSeconds = CircuitBreakerSettings.DefaultHalfOpenResetInterval,
-            int resetIntervalInSeconds = CircuitBreakerSettings.DefaultCloseResetInterval
+            int resetIntervalInSeconds = CircuitBreakerSettings.DefaultCloseResetInterval,
+            ResetMode resetMode = ResetMode.WhileAnyState
         )
             where TException : Exception
         {
-            var settings = new CircuitBreakerSettings(attempts, trackingPeriodInSeconds, halfOpenPeriodInSeconds, resetIntervalInSeconds);
+            return OpenOn<TException>(attempts, trackingPeriodInSeconds, _ => TimeSpan.FromSeconds(halfOpenPeriodInSeconds), resetIntervalInSeconds, resetMode);
+        }
+
+        /// <summary>
+        /// Register a circuit breaker based on an <typeparamref name="TException"/>
+        /// </summary>
+        /// <param name="halfOpenPeriodProvider">
+        ///     A callback which provides the number of seconds to wait before transitioning to the half open state. The number of times 
+        ///     the circuit breaker has entered the HalfOpen state consecutively is passed as a parameter to this callback, starting at 0 
+        ///     and being reset once the circuit breaker enters the closed state.
+        /// </param>
+        /// <typeparam name="TException">Exception type to trip the circuit breaker on</typeparam>
+        public CircuitBreakerConfigurationBuilder OpenOn<TException>(
+            int attempts,
+            int trackingPeriodInSeconds,
+            Func<int, TimeSpan> halfOpenPeriodProvider,
+            int resetIntervalInSeconds = CircuitBreakerSettings.DefaultCloseResetInterval,
+            ResetMode resetMode = ResetMode.WhileAnyState)
+            where TException : Exception
+        {
+            halfOpenPeriodProvider ??= _ => TimeSpan.FromSeconds(CircuitBreakerSettings.DefaultHalfOpenResetInterval);
+
+            var settings = new CircuitBreakerSettings(attempts, trackingPeriodInSeconds, halfOpenPeriodProvider, resetIntervalInSeconds, resetMode);
 
             _circuitBreakerFactories.Add(context => new ExceptionTypeCircuitBreaker(typeof(TException), settings, context.Get<IRebusTime>()));
 

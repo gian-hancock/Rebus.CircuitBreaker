@@ -16,6 +16,9 @@ class ExceptionTypeCircuitBreaker : ICircuitBreaker
     readonly IRebusTime rebusTime;
     readonly Type exceptionType;
 
+    int _consecutiveHalfOpenAttempts = 0;
+    DateTimeOffset _lastHalfOpened;
+
     public ExceptionTypeCircuitBreaker(Type exceptionType, CircuitBreakerSettings settings, IRebusTime rebusTime)
     {
         this.exceptionType = exceptionType ?? throw new ArgumentNullException(nameof(exceptionType));
@@ -27,7 +30,29 @@ class ExceptionTypeCircuitBreaker : ICircuitBreaker
         _errorDates = new ConcurrentDictionary<long, DateTimeOffset>();
     }
 
-    public CircuitBreakerState State { get; private set; }
+    CircuitBreakerState state;
+    public CircuitBreakerState State
+    {
+        get => state; private set
+        {
+            switch (value) {
+                case CircuitBreakerState.HalfOpen:
+                    if (state != CircuitBreakerState.HalfOpen)
+                    {
+                        _lastHalfOpened = rebusTime.Now;
+                        _consecutiveHalfOpenAttempts++;
+                    }
+                    break;
+                case CircuitBreakerState.Closed:
+                    if (state != CircuitBreakerState.Closed)
+                    {
+                        _consecutiveHalfOpenAttempts = 0;
+                    }
+                    break;
+            }
+            state = value;
+        }
+    }
 
     public bool IsClosed => State == CircuitBreakerState.Closed;
 
@@ -86,14 +111,30 @@ class ExceptionTypeCircuitBreaker : ICircuitBreaker
 
         var currentTime = rebusTime.Now;
 
-        if (currentTime > latestError.Value + settings.HalfOpenResetInterval)
-        {
+        var halfOpenInterval = settings.HalfOpenResetIntervalProvider(_consecutiveHalfOpenAttempts);
+        if (currentTime > latestError.Value + halfOpenInterval) {
             State = CircuitBreakerState.HalfOpen;
         }
 
-        if (currentTime > latestError.Value + settings.CloseResetInterval)
+        bool hasErrWithinResetInterval = currentTime > latestError.Value + settings.CloseResetInterval;
+        switch (settings.ResetMode)
         {
-            State = CircuitBreakerState.Closed;
+            case ResetMode.WhileAnyState:
+                if (hasErrWithinResetInterval)
+                {
+                    State = CircuitBreakerState.Closed;
+                }
+                break;
+            case ResetMode.WhileHalfOpen:
+                if (
+                    State == CircuitBreakerState.HalfOpen
+                    && hasErrWithinResetInterval
+                    && (rebusTime.Now - _lastHalfOpened) > settings.CloseResetInterval // We have been halfOpen for at least the reset interval
+                )
+                {
+                    State = CircuitBreakerState.Closed;
+                }
+                break;
         }
     }
 

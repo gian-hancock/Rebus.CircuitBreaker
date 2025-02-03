@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Rebus.CircuitBreaker;
+using System;
 
 namespace Rebus.Config;
 
@@ -43,18 +44,40 @@ class CircuitBreakerSettings
     internal TimeSpan CloseResetInterval { get; private set; }
 
     /// <summary>
+    /// The <see cref="ResetMode"/> the circuit breaker will operate in
+    /// </summary>
+    internal ResetMode ResetMode { get; private set; }
+
+    /// <summary>
     /// Time Interval for when the circuit breaker will move to Half Open after being in an Open State
     /// </summary>
-    internal TimeSpan HalfOpenResetInterval { get; private set; }
+    internal Func<int, TimeSpan> HalfOpenResetIntervalProvider { get; private set; }
 
     /// <summary>
     /// Create a setting for a given circuit breaker
     /// </summary>
-    internal CircuitBreakerSettings(int attempts, int trackingPeriodInSeconds, int halfOpenResetIntervalInSeconds, int closedResetIntervalInSeconds)
+    internal CircuitBreakerSettings(
+        int attempts,
+        int trackingPeriodInSeconds,
+        int halfOpenResetInterval,
+        int closedResetIntervalInSeconds,
+        ResetMode resetMode = ResetMode.WhileAnyState)
+        : this(attempts, trackingPeriodInSeconds, _ => TimeSpan.FromSeconds(halfOpenResetInterval), closedResetIntervalInSeconds, resetMode)
+    { }
+
+    /// <summary>
+    /// Create a setting for a given circuit breaker
+    /// </summary>
+    internal CircuitBreakerSettings(
+        int attempts, int trackingPeriodInSeconds, 
+        Func<int, TimeSpan> halfOpenResetIntervalProvider, 
+        int closedResetIntervalInSeconds, 
+        ResetMode resetMode = ResetMode.WhileAnyState)
     {
         Attempts = attempts;
         TrackingPeriod = TimeSpan.FromSeconds(trackingPeriodInSeconds);
-        HalfOpenResetInterval = TimeSpan.FromSeconds(halfOpenResetIntervalInSeconds);
+        HalfOpenResetIntervalProvider = halfOpenResetIntervalProvider;
         CloseResetInterval = TimeSpan.FromSeconds(closedResetIntervalInSeconds);
+        ResetMode = resetMode;
     }
 }

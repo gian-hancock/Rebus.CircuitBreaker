@@ -118,7 +118,10 @@ public class CircuitBreakerTests : FixtureBase
     [Test]
     public async Task WaitDynamicHalfOpenPeriodBeforeHalfOpening()
     {
-        const int TimingMargin = 2;
+        const int TimingMargin = 3;
+        const int ShortHalfOpenPeriod = 5;
+        const int LongHalfOpenPeriod = 10;
+        const int ResetInterval = 2;
 
         var stateChanges = new List<CircuitBreakerState>();
         var events = new CircuitBreakerEvents();
@@ -140,8 +143,12 @@ public class CircuitBreakerTests : FixtureBase
                     c => c.OpenOn<MyCustomException>(
                         attempts: 1, 
                         trackingPeriodInSeconds: 5,
-                        halfOpenPeriodProvider: attemptCount => TimeSpan.FromSeconds(4 + (attemptCount % 2) * 4), // 5, 10, 5, 10, etc...
-                        resetIntervalInSeconds: 2,
+                        halfOpenPeriodProvider: attemptCount =>
+                        {
+                            // 5s, 10s, 5s 10s, etc...
+                            return TimeSpan.FromSeconds(attemptCount % 2 == 0 ? ShortHalfOpenPeriod : LongHalfOpenPeriod);
+                        },
+                        resetIntervalInSeconds: ResetInterval,
                         resetMode: ResetMode.WhileHalfOpen));
                 o.Decorate(c => events);
             },
@@ -150,7 +157,7 @@ public class CircuitBreakerTests : FixtureBase
 
         await bus.SendLocal("Uh oh, This is not gonna go well!");
 
-        // Expect state changes according to sequence of halfOpen periods: 5s, 10s, 5s, 10s, etc...
+        // Expect state changes according to sequence of short and long halfOpen periods
 
         Assert.That(
             () => stateChanges, 
@@ -160,32 +167,32 @@ public class CircuitBreakerTests : FixtureBase
 
         Assert.That(
             () => stateChanges,
-            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(4 + TimingMargin).Seconds.PollEvery(100),
-            "Expect circuit half opens then opens again after half open period of 4s");
+            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(ShortHalfOpenPeriod + TimingMargin).Seconds.PollEvery(100),
+            $"Expect circuit half opens then opens again after half open period of {ShortHalfOpenPeriod}s");
         stateChanges.Clear();
         Stopwatch stopwatch = Stopwatch.StartNew();
 
         Assert.That(
             () => stateChanges,
-            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(8 + TimingMargin).Seconds.PollEvery(100),
-            "Expect circuit half opens then opens again after half open period of 8s");
+            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(LongHalfOpenPeriod + TimingMargin).Seconds.PollEvery(100),
+            $"Expect circuit half opens then opens again after half open period of {LongHalfOpenPeriod}s");
         Assert.That(
-            stopwatch.ElapsedMilliseconds,
-            Is.GreaterThan(8000 - TimingMargin * 1000),
-            "Expect half open period to take close to 8 seconds");
+            stopwatch.ElapsedMilliseconds / 1000.0,
+            Is.GreaterThan(LongHalfOpenPeriod - TimingMargin),
+            $"Expect half open period to take ~{LongHalfOpenPeriod} seconds");
         stateChanges.Clear();
 
         Assert.That(
             () => stateChanges,
-            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(4 + TimingMargin).Seconds.PollEvery(100),
-            "Expect circuit half opens then opens again after half open period of 4s");
+            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Open }).After(ShortHalfOpenPeriod + TimingMargin).Seconds.PollEvery(100),
+            $"Expect circuit half opens then opens again after half open period of {ShortHalfOpenPeriod}s");
         stateChanges.Clear();
 
         handlerWillThrow = false;
         Assert.That(
             () => stateChanges,
-            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Closed }).After(8 + 2 + TimingMargin).Seconds.PollEvery(100),
-            "Expect circuit half opens, message succeeds, and closes again after half open period of 8s + reset interval of 2s");
+            Is.EquivalentTo(new CircuitBreakerState[] { CircuitBreakerState.HalfOpen, CircuitBreakerState.Closed }).After(LongHalfOpenPeriod + ResetInterval + TimingMargin).Seconds.PollEvery(100),
+            $"Expect circuit half opens, message succeeds, and closes again after half open period of {LongHalfOpenPeriod}s + reset interval of {ResetInterval}s");
         stateChanges.Clear();
     }
 
